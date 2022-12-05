@@ -23,11 +23,19 @@ Overview
 Hardware
 -------------------
 
-The Radio Module used is a TEA5767NH. An OLED CH1115 is used as a screen
-for output. 3 push buttons are used for control (Mute ,Search up radio band ,Search down radio band). The ADC is used to read the output of the Audio Amplifier which is connected to Audio Out of the Radio module thru a voltage divider.
-This gives us a volume indicator.  An AHT10 sensor is read 
-and it's temperature and humidity data is displayed at bottom of screen.
-As the TEA5767 is a 5 volt logic device(and PICO GPIO is 3.3V)  I connect to it through a voltage level inverter. I had to use two separate buses for both I2C devices as they would not work reliably on same bus. The on-board PICO Status LED is used.
+The Radio Module used is a TEA5767NH. 
+Headphones can be connected to the Audio out of the TEA5767 12C module.
+If the user wishes to drive  a speaker an Audio amplifier will be required like an LM386.
+The ADC is used to read the volume  control of the Audio Amplifier module thru a voltage divider. Audio amplifier should not be powered at more than 5 volts. 
+This gives us a volume indicator.
+
+An OLED CH1115 is used as a screen for output. by SPI
+
+3 push buttons are used for control (Mute ,Search up radio band ,Search down radio band).   
+
+An AHT10 12C sensor is read and it's temperature and humidity data is displayed at bottom of screen.
+
+As the TEA5767 is a 5 volt logic device(and PICO GPIO is 3.3V)  I connect to it through a voltage level shifter circuit. I had to use two separate buses for both I2C devices as they would not work reliably on same bus. The on-board PICO Status LED is also used.
 
  ![image ](https://github.com/gavinlyonsrepo/TEA5767_PICO/blob/main/extra/images/radio.jpg)
 
@@ -43,7 +51,11 @@ in the library.
 Schematic
 -------------------
 
-1. TODO
+1. "VIN" is the AUDIO out to the amplifier circuit for speaker  if used. 
+2. "Audio_ADJ" is from the volume control pot of amplifier circuit.
+3. 5V Amplifier circuit not shown(TODO).
+
+![ sch](https://github.com/gavinlyonsrepo/FM_RADIO_PICO/blob/main/extra/images/sch.png)
 
 
 Output
