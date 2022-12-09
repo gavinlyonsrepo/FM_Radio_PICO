@@ -53,9 +53,14 @@ On Startup a splash screen is displayed followed by a radio station selection me
 a radio station from a list by pressing mute button and navigate menu using search buttons. 
 
 The settings menu can be accessed by holding down the mute button for longer than 3 seconds 
-It contains two settings currently , these settings define behaviour of search buttons.
+It contains five settings currently , 1&2 define behaviour of search buttons,
+3-5 define display mode.
+
 1. Scan search and tune to stations automatically (default)
 2. Fine tune search, Each press changes frequency by +/- 50 Khz
+3. Display mode default 
+4. Display Radio info only
+5. Display Sensor data only , large text 
 
 Schematic
 -------------------

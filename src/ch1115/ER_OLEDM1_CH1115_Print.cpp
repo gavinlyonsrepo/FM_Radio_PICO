@@ -30,6 +30,15 @@
 // Public Methods 
 
 /* default implementation: may be overridden */
+
+size_t Print::print(const std::string &s) {
+    return write(s.c_str(), s.length());
+}
+
+size_t Print::println(const std::string &s) {
+    return println(s);
+}
+
 size_t Print::write(const uint8_t *buffer, size_t size)
 {
   size_t n = 0;

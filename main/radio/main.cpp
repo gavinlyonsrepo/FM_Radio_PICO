@@ -12,8 +12,10 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "hardware/adc.h"
-#include <vector> // used in DisplaySelectMenu
+#include <string>  // used by vector 
+#include <vector> // used in menu display
 #include <time.h> // for settings function (time hold of the button)
+
 
 // Custom libraries, all here https://github.com/gavinlyonsrepo/RPI_PICO_projects_list
 #include "ch1115/ER_OLEDM1_CH1115.hpp" // OLED
@@ -41,29 +43,38 @@ PushButton SearchDownBtn(5, 10);
 
 // OLED  
 uint8_t screenBuffer[128  * (64 / 8)]; // 1024 bytes = w by h/8 , 128 * 64/8 
+
+typedef enum 
+{
+	DisplayMode_Default = 2, // default display both radio and temperature
+	DisplayMode_Radio = 3, // display just radio info
+  DisplayMode_Sensor = 4 // display just temperature sensor info
+}DisplayMode_e; // sets the display mode from settings menu
+
+DisplayMode_e DisplayMode = DisplayMode_Default;
 ERMCH1115  myOLED(2, 3, 4, 18, 19); 
 
 LIB_AHTXX myAHT10(AHT10_ADDRESS_0X38, AHT10_SENSOR); // AHT10
 
-//radio
+// Radio
 typedef enum 
 {
-	RadioScanSearch = 2, // tunes automatically to signal
-	RadioFineTune = 3 // manually fine tunes in increments +/- 50kHz
-}RadioScanMode_e; // sets the scan mode
+	RadioScan_Search = 2, // tunes automatically to signal, default
+	RadioFine_Tune = 3 // manually fine tunes in increments +/- 50kHz
+}RadioScanMode_e; // sets the scan mode on search button press
 
 TEA5767N radio;
-RadioScanMode_e RadioScanMode = RadioScanSearch;
+RadioScanMode_e RadioScanMode = RadioScan_Search;
 
 // === Function Prototypes ===
 void Setup(void);
 
 void SplashScreen(void); //Splash screen shown once at start-up
 
-void SelectStation(float &); // Seleect station screen shown at startup once
+void SelectStation(float &); // Select station screen shown at startup once
 float DisplaySelectMenu(int8_t);
 
-void Settings(void); // Seetings menu displayed if mute button held done > 3 seconds.
+void Settings(void); // Settings menu displayed if mute button held done > 3 seconds.
 void DisplaySettingsMenu(int8_t);
 
 // Check, read and display radio module
@@ -212,11 +223,12 @@ uint16_t map(uint32_t x, uint16_t in_min, uint16_t in_max, uint16_t out_min, uin
 // Function used to read AHT10 display sensor on timing define "intervalAHT10"
 // Param 1 Pointer to a Array of two floats
 // One to hold temperature, One to hold Humidity data.
-// Returns: bool true = Data was read , false Data was not read
+// Returns: bool true = Data read , false =Data  not read or wrong display_mode
 bool ReadAHT10(float* AHT10_data)
 {
     static uint32_t prevMillAHT10 = to_ms_since_boot(get_absolute_time());
     if (myAHT10.AHT10_GetIsConnected() == false) return false;
+    if (DisplayMode == DisplayMode_Radio) return false;
 
     if ((to_ms_since_boot(get_absolute_time()) - prevMillAHT10) >= intervalAHT10){ 
         prevMillAHT10 = to_ms_since_boot(get_absolute_time()); 
@@ -231,10 +243,12 @@ bool ReadAHT10(float* AHT10_data)
 
 //  Function used to read radio signal Level on define "intervalRadioSignalLevel"
 //  Param1 :: uint8_t :: Signal Level
-//  Returns: bool true = Data was read, false Data was not read
+//  Returns: bool true = Data read, false = Data not read, or wrong display_mode
 bool ReadRadioSignalLevel(uint8_t SigLevel)
 {
     static uint32_t prevMillSignalLevel = to_ms_since_boot(get_absolute_time());
+    if (DisplayMode == DisplayMode_Sensor) return false;
+
     if ((to_ms_since_boot(get_absolute_time()) - prevMillSignalLevel) >= intervalRadioSignalLevel){ 
         prevMillSignalLevel = to_ms_since_boot(get_absolute_time()); 
         SigLevel = radio.getSignalLevel();
@@ -282,6 +296,7 @@ void DisplayRadioInfo(uint8_t SigLevel, float freqRadio){
 // Param 1 uint16_t  ADC result
 void DisplayVolInfo(uint16_t ADCResult)
 {
+    if (DisplayMode == DisplayMode_Sensor) return;
     // Clear the radio area sector
     myOLED.fillRect(0, 32, 128, 16, BACKGROUND);
 
@@ -311,34 +326,77 @@ void DisplayVolInfo(uint16_t ADCResult)
 // Param 1 Pointer to array of floats with AHT10 data
 void DisplayAHT10Info(float * AHT10_Data)
 {
+
   myOLED.fillRect(0, 48, 128, 16, BACKGROUND);
-  if (myAHT10.AHT10_GetIsConnected() == false) // Offline, failed init
+  if (DisplayMode != DisplayMode_Sensor)
   {
-    myOLED.setCursor(20,52);
-    myOLED.setFontNum(OLEDFontType_Tiny);
-    myOLED.print("AHT10 sensor not connected");
-  }else{
-    //  Temperature
-    myOLED.setFontNum(OLEDFontType_Default);
-    myOLED.setCursor(20,52);
-    myOLED.drawBitmap(0, 48, pTemperatureImage, 16, 16, BACKGROUND, FOREGROUND);
-    if (AHT10_Data[0] != AHT10_ERROR) {
-    myOLED.print("T");
-    myOLED.print(AHT10_Data[0] , 2);
-    myOLED.print("C");
-    } else {
-    myOLED.print("Error 2");
+    if (myAHT10.AHT10_GetIsConnected() == false) // Offline, failed init
+    {
+      myOLED.setCursor(20,52);
+      myOLED.setFontNum(OLEDFontType_Tiny);
+      myOLED.print("AHT10 sensor not connected");
+    }else{
+      //  Temperature
+      myOLED.setFontNum(OLEDFontType_Default);
+      myOLED.setCursor(20,52);
+      myOLED.drawBitmap(0, 48, pTemperatureImage, 16, 16, BACKGROUND, FOREGROUND);
+      if (AHT10_Data[0] != AHT10_ERROR) {
+       myOLED.print("T");
+       myOLED.print(AHT10_Data[0] , 2);
+       myOLED.print("C");
+      } else {
+        myOLED.print("Error 2");
+      }
+      // Humidity
+      myOLED.setCursor(84,52);
+      myOLED.drawBitmap(64, 48, pHumidityImage, 16, 16, BACKGROUND, FOREGROUND);
+      if (AHT10_Data[1] != AHT10_ERROR) {
+        myOLED.print("H");
+        myOLED.print(AHT10_Data[1], 2);
+        myOLED.print("%");
+      } else {
+        myOLED.print("Error 2");
+      }
     }
-        
-    // Humidity
-    myOLED.setCursor(84,52);
-    myOLED.drawBitmap(64, 48, pHumidityImage, 16, 16, BACKGROUND, FOREGROUND);
-    if (AHT10_Data[1] != AHT10_ERROR) {
-      myOLED.print("H");
-      myOLED.print(AHT10_Data[1], 2);
-      myOLED.print("%");
-    } else {
+  }else{ // sensor display only
+     myOLED.OLEDclearBuffer();
+     myOLED.setFontNum(OLEDFontType_Default);
+     myOLED.setTextSize(1);
+
+    if (myAHT10.AHT10_GetIsConnected() == false) // Offline, failed init
+    {
+      myOLED.setCursor(10,10);
+      myOLED.setFontNum(OLEDFontType_Tiny);
+      myOLED.println("AHT10 sensor");
+      myOLED.print("not connected");
+    }else{
+      //  Temperature
+      myOLED.drawBitmap(0, 0, pTemperatureImage, 16, 16, BACKGROUND, FOREGROUND);
+      myOLED.setCursor(24,0);
+      myOLED.print("Temperature");
+      myOLED.setCursor(24,15);
+      if (AHT10_Data[0] != AHT10_ERROR) {
+        myOLED.setTextSize(2);
+        myOLED.print(AHT10_Data[0] , 2);
+        myOLED.setTextSize(1);
+        myOLED.print("C");
+      } else {
       myOLED.print("Error 2");
+      }
+      // Humidity
+      myOLED.drawBitmap(0, 32, pHumidityImage, 16, 16, BACKGROUND, FOREGROUND);
+      myOLED.setCursor(24, 32);
+      myOLED.print("Humidity");
+      myOLED.setCursor(24,48);
+      if (AHT10_Data[1] != AHT10_ERROR) {
+        myOLED.setTextSize(2);
+        myOLED.print(AHT10_Data[1], 2);
+        myOLED.setTextSize(1);
+        myOLED.print("%");
+      } else {
+        myOLED.print("Error 2");
+      }
+      myOLED.setTextSize(1);
     }
   }
   // write to buffer
@@ -350,9 +408,10 @@ void DisplayAHT10Info(float * AHT10_Data)
 //  Also read ADC for volume
 //  Param1 :: volume level passed by reference
 //  Note reads ADC
-//  Returns: bool true = ADC was read, false ADC was not read
+//  Returns: bool true = ADC was read, false = ADC was not read or wrong display_mode
 bool ReadVolLevel(uint16_t &VolLevel)
 {
+    if (DisplayMode == DisplayMode_Sensor) return false;
     static uint32_t prevMillDisplay = to_ms_since_boot(get_absolute_time());
     if ((to_ms_since_boot(get_absolute_time()) - prevMillDisplay) >= intervalVolDisplay)
     { 
@@ -375,14 +434,14 @@ bool CheckSearchUp(uint8_t &sigLevel, float &freqRadio)
     if (SearchUpBtn.IsPressed())
     {
         if (bDebugPrint) printf("Button up pressed , scan mode %d\r\n", RadioScanMode);
-        if (RadioScanMode == RadioScanSearch)
+        if (RadioScanMode == RadioScan_Search)
         {
           radio.setSearchUp();
           radio.setSearchLowStopLevel(); // try radio.setSearchMidStopLevel() if too sensitive
           radio.searchNextMuting();
           busy_wait_ms(700); // give time to let radio module tune 
           freqRadio = radio.readFrequencyInMHz();
-        }else if (RadioScanMode == RadioFineTune)
+        }else if (RadioScanMode == RadioFine_Tune)
         {
           freqRadio = freqRadio + 0.05;
           radio.selectFrequency(freqRadio);
@@ -404,7 +463,7 @@ bool CheckSearchDown(uint8_t &sigLevel, float &freqRadio)
     if (SearchDownBtn.IsPressed())
     {
         if (bDebugPrint) printf("Button down pressed, scan mode %d\r\n",RadioScanMode);
-        if (RadioScanMode == RadioScanSearch)
+        if (RadioScanMode == RadioScan_Search)
         {
           radio.setSearchDown();
           radio.setSearchLowStopLevel(); // try radio.setSearchMidStopLevel() if too sensitive
@@ -412,7 +471,7 @@ bool CheckSearchDown(uint8_t &sigLevel, float &freqRadio)
           busy_wait_ms(700); // give time to let radio module tune 
           freqRadio = radio.readFrequencyInMHz();
          
-        }else if (RadioScanMode == RadioFineTune)
+        }else if (RadioScanMode == RadioFine_Tune)
         {
           freqRadio = freqRadio - 0.05;
           radio.selectFrequency(freqRadio);
@@ -487,6 +546,8 @@ void RadioIsConnect(float &freqRadio)
 // search buttons scan up and down menu options
 void SelectStation(float &freqRadio)
 {
+  myOLED.setFontNum(OLEDFontType_Default);
+  myOLED.setTextSize(1);
   myOLED.OLEDfadeEffect(); // turn on fade effect
   int8_t menuChoice = 0; // hold menu row index 0-5
   float stationSelected = 0.0; // user menu choice
@@ -552,11 +613,13 @@ float DisplaySelectMenu(int8_t menuChoice)
 void DisplaySettingsMenu(int8_t menuChoice)
 {
   myOLED.OLEDclearBuffer();
-  myOLED.drawRoundRect(10, menuChoice * 10, 100, 10,5, FOREGROUND);
-  myOLED.setCursor(20, 1);
-  myOLED.print("Scan Search");
-  myOLED.setCursor(20, 12);
-  myOLED.print("Fine Tune");
+  uint8_t rowNo = 0;
+  std::vector<std::string> SettingsList= {"Scan Search", "Scan Fine Tune", "Display Default", "Display Radio", "Display AHT10"};
+  myOLED.drawRoundRect(10, menuChoice * 10, 112, 10,5, FOREGROUND);
+  for (std::string i :SettingsList) {
+    myOLED.setCursor(18, (rowNo++ * 10)+1);
+    myOLED.print(i);
+  }
   myOLED.OLEDupdate();
 }
 
@@ -569,6 +632,8 @@ void Settings(void)
 {
   int8_t menuChoice = 0;
   uint8_t SelectedMode = 2;
+  myOLED.setFontNum(OLEDFontType_Default);
+  myOLED.setTextSize(1);
   myOLED.OLEDclearBuffer();
   myOLED.drawBitmap(36, 0, pSettingsImage, 64, 64, FOREGROUND, BACKGROUND);
   myOLED.OLEDupdate();
@@ -580,10 +645,14 @@ void Settings(void)
   {
     if (MuteBtn.IsPressed()) // mute press, leave 
     {
-      if (menuChoice == 0)
-        RadioScanMode = RadioScanSearch;  
-      else if(menuChoice == 1)
-        RadioScanMode = RadioFineTune; 
+      switch (menuChoice)
+      {
+        case 0: RadioScanMode = RadioScan_Search;  break;
+        case 1: RadioScanMode = RadioFine_Tune;  break;
+        case 2: DisplayMode = DisplayMode_Default; break;
+        case 3: DisplayMode = DisplayMode_Radio; break;
+        case 4: DisplayMode = DisplayMode_Sensor; break;
+      }
       radio.turnTheSoundBackOn();
       break;
     }
@@ -591,14 +660,14 @@ void Settings(void)
     if (SearchDownBtn.IsPressed()) // Scan down menu
     {
       menuChoice ++;
-      if  (menuChoice == 2) menuChoice = 0;
+      if  (menuChoice == 5) menuChoice = 0;
         DisplaySettingsMenu(menuChoice);
     }
 
     if (SearchUpBtn.IsPressed()) // scan up menu
     {
       menuChoice --;
-      if  (menuChoice == -1) menuChoice = 1;
+      if  (menuChoice == -1) menuChoice = 4;
         DisplaySettingsMenu(menuChoice);
     }
   }; //end of while
