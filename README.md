@@ -19,6 +19,8 @@ Overview
 	1. Raspberry pi PICO RP2040
 	2. SDK C++ compiler G++ for arm-none-eabi
 	3. CMAKE , VScode
+	
+![ ov](https://github.com/gavinlyonsrepo/FM_RADIO_PICO/blob/main/extra/images/overview.png)
 
 Hardware
 -------------------

@@ -131,7 +131,6 @@ void TEA5767N::setFrequency(float _frequency) {
 void TEA5767N::transmitData() {
 	
 	int16_t returnValue = 0;
-	uint8_t txbyte = 0;
 	returnValue =i2c_write_timeout_us(i2c, _i2cAddress, transmission_data, 5 ,false, TEA5767_I2C_DELAY);
 	//returnValue = i2c_write_blocking(i2c, _i2cAddress, transmission_data, 5 ,false); // alternative
 	if (bdebug) printf(" tx return value %d \r\n", returnValue);

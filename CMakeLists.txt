@@ -12,6 +12,9 @@ set(CMAKE_CXX_STANDARD 17)
 # Creates a pico-sdk subdirectory in our project for the libraries
 pico_sdk_init()
 
+# turn on all compiler warnings 
+add_compile_options(-Wall)
+
 # Tell CMake where to find the executable source file #0
 add_executable(${PROJECT_NAME} 
   main/radio/main.cpp
